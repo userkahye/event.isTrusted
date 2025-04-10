@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event.isTrusted - Mouse & Key (Vertical Gap)</title>
+
+    <style>
+        /* Basic Styling */
+        body {
+            font-family: sans-serif;
+            line-height: 1.6;
+            padding: 20px;
+            min-height: 200px; /* Give some space for mouse movement */
+            background-color: #f0f0f0; /* Light background to see clicks */
+            color: #333;
+        }
+
+        h1 {
+            color: #1a1a1a;
+        }
+
+        /* Style the output area */
+        #output-area {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ccc;
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+        }
+
+        /* Style the individual lines within the output area */
+        .output-line {
+            margin-bottom: 10px; /* <<< ADDS VERTICAL GAP BETWEEN LINES */
+            /* Ensure it takes full width if needed, though usually default for div */
+            display: block;
+        }
+        /* Remove margin from the very last line */
+        .output-line:last-child {
+             margin-bottom: 0;
+        }
+
+
+        /* Style the specific value displays (the spans) */
+        #eventType,
+        #isTrustedValue {
+            font-weight: bold;
+            display: inline-block; /* Keep them inline within their line */
+            min-width: 60px; /* Give some space */
+            padding: 3px 6px; /* Slightly adjusted padding */
+            border-radius: 3px;
+            margin-left: 5px; /* Space from the label text */
+            vertical-align: middle; /* Align nicely with the label text */
+        }
+
+        #eventType {
+             background-color: #e0e0e0;
+             color: #555;
+        }
+
+        /* Initial color for isTrusted - will be changed by JS */
+        #isTrustedValue {
+            color: #ffffff;
+            background-color: #6c757d; /* Default neutral color */
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Event.isTrusted Example</h1>
+    <p>Move your mouse, click anywhere, or type on the keyboard.</p>
+    <p>The details of the last event will be shown below.</p>
+
+    <hr>
+
+    <!-- Area to display the result -->
+    <div id="output-area">
+        <!-- Line 1: Event Type -->
+        <div class="output-line">
+             Last Event Type: <span id="eventType">N/A</span>
+        </div>
+         <!-- Line 2: isTrusted Value -->
+        <div class="output-line">
+             event.isTrusted: <span id="isTrustedValue">N/A</span>
+        </div>
+    </div>
+
+    <script>
+        // Wait for the DOM to be fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+
+            // Get references to the output elements
+            const eventTypeSpan = document.getElementById('eventType');
+            const isTrustedValueSpan = document.getElementById('isTrustedValue');
+
+            // --- Central Event Handler Function ---
+            function handleEvent(event) {
+                const type = event.type;
+                const trusted = event.isTrusted;
+
+                // Update the text content of the spans
+                eventTypeSpan.textContent = type;
+                isTrustedValueSpan.textContent = trusted;
+
+                // Log to console (optional)
+                console.clear();
+                console.log(`Event Type: ${type}`);
+                if (type === 'keydown') {
+                    console.log(`Key Pressed: ${event.key}`);
+                }
+                console.log(`event.isTrusted: ${trusted}`);
+
+                // Update the visual style based on the trust level
+                if (trusted) {
+                    isTrustedValueSpan.style.backgroundColor = '#28a745'; // Green
+                    isTrustedValueSpan.style.color = '#ffffff';
+                } else {
+                    isTrustedValueSpan.style.backgroundColor = '#dc3545'; // Red
+                    isTrustedValueSpan.style.color = '#ffffff';
+                }
+            }
+
+            // --- Attach Event Listeners ---
+            document.addEventListener('mousemove', handleEvent);
+            document.addEventListener('click', handleEvent);
+            document.addEventListener('keydown', handleEvent);
+
+            console.log("Event listeners for mousemove, click, and keydown are active.");
+
+        }); // End of DOMContentLoaded listener
+    </script>
+
+</body>
+</html>
