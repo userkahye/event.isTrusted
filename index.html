@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Event.isTrusted - Mouse & Key (Vertical Gap)</title>
+    <title>Advanced Event Analysis</title>
 
     <style>
         /* Basic Styling */
@@ -11,13 +11,21 @@
             font-family: sans-serif;
             line-height: 1.6;
             padding: 20px;
-            min-height: 200px; /* Give some space for mouse movement */
-            background-color: #f0f0f0; /* Light background to see clicks */
+            min-height: 300px; /* Give more space */
+            background-color: #f0f0f0;
             color: #333;
         }
 
         h1 {
             color: #1a1a1a;
+        }
+
+        p {
+            max-width: 600px;
+        }
+
+        hr {
+            margin: 25px 0;
         }
 
         /* Style the output area */
@@ -28,105 +36,198 @@
             background-color: #fff;
             border-radius: 5px;
             box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+            max-width: 450px; /* Keep it reasonably sized */
         }
 
         /* Style the individual lines within the output area */
         .output-line {
-            margin-bottom: 10px; /* <<< ADDS VERTICAL GAP BETWEEN LINES */
-            /* Ensure it takes full width if needed, though usually default for div */
+            margin-bottom: 12px; /* Increased gap slightly */
             display: block;
+            line-height: 1.4; /* Adjust line height for clarity */
         }
-        /* Remove margin from the very last line */
         .output-line:last-child {
              margin-bottom: 0;
+        }
+        .output-label {
+            display: inline-block;
+            min-width: 180px; /* Align labels */
+            font-weight: normal;
+            color: #555;
         }
 
 
         /* Style the specific value displays (the spans) */
         #eventType,
-        #isTrustedValue {
+        #isTrustedValue,
+        #coordsMatchValue,
+        #coalescedCountValue {
             font-weight: bold;
-            display: inline-block; /* Keep them inline within their line */
-            min-width: 60px; /* Give some space */
-            padding: 3px 6px; /* Slightly adjusted padding */
-            border-radius: 3px;
-            margin-left: 5px; /* Space from the label text */
-            vertical-align: middle; /* Align nicely with the label text */
+            display: inline-block;
+            min-width: 50px;
+            text-align: center;
+            padding: 3px 8px;
+            border-radius: 4px;
+            margin-left: 8px;
+            vertical-align: middle;
+            color: #ffffff; /* Default text color for badges */
         }
 
         #eventType {
-             background-color: #e0e0e0;
-             color: #555;
+             background-color: #6c757d; /* Grey */
         }
 
         /* Initial color for isTrusted - will be changed by JS */
         #isTrustedValue {
-            color: #ffffff;
             background-color: #6c757d; /* Default neutral color */
+        }
+         /* Start coordsMatchValue as neutral */
+        #coordsMatchValue {
+             background-color: #6c757d; /* Default neutral color */
+        }
+
+        #coalescedCountValue {
+             background-color: #17a2b8; /* Info blue */
         }
     </style>
 </head>
 <body>
 
-    <h1>Event.isTrusted Test</h1>
-    <p>Move your mouse, click anywhere, or type on the keyboard.</p>
-    <p>The details of the last event will be shown below.</p>
+    <h1>Advanced Event Analysis Demo</h1>
+    <p>Move your mouse, click anywhere, or type. This demo checks:</p>
+    <ul>
+        <li>Standard `event.isTrusted`.</li>
+        <li>If page coordinates match screen coordinates (potential CDP leak, ignoring fullscreen).</li>
+        <li>The number of coalesced events (often 0 for simulated events).</li>
+    </ul>
 
     <hr>
 
     <!-- Area to display the result -->
     <div id="output-area">
-        <!-- Line 1: Event Type -->
         <div class="output-line">
-             Last Event Type: <span id="eventType">N/A</span>
+             <span class="output-label">Last Event Type:</span><span id="eventType">N/A</span>
         </div>
-         <!-- Line 2: isTrusted Value -->
         <div class="output-line">
-             event.isTrusted: <span id="isTrustedValue">N/A</span>
+             <span class="output-label">event.isTrusted:</span><span id="isTrustedValue">N/A</span>
+        </div>
+        <div class="output-line">
+             <span class="output-label">Coords Match Screen?:</span><span id="coordsMatchValue">N/A</span>
+        </div>
+         <div class="output-line">
+             <span class="output-label">Coalesced Events Count:</span><span id="coalescedCountValue">N/A</span>
         </div>
     </div>
 
     <script>
-        // Wait for the DOM to be fully loaded
         document.addEventListener('DOMContentLoaded', function() {
 
             // Get references to the output elements
             const eventTypeSpan = document.getElementById('eventType');
             const isTrustedValueSpan = document.getElementById('isTrustedValue');
+            const coordsMatchSpan = document.getElementById('coordsMatchValue');
+            const coalescedCountSpan = document.getElementById('coalescedCountValue');
 
             // --- Central Event Handler Function ---
             function handleEvent(event) {
                 const type = event.type;
                 const trusted = event.isTrusted;
 
-                // Update the text content of the spans
+                // --- Check 1: isTrusted (Already done) ---
                 eventTypeSpan.textContent = type;
                 isTrustedValueSpan.textContent = trusted;
-
-                // Log to console (optional)
-                console.clear();
-                console.log(`Event Type: ${type}`);
-                if (type === 'keydown') {
-                    console.log(`Key Pressed: ${event.key}`);
-                }
-                console.log(`event.isTrusted: ${trusted}`);
-
-                // Update the visual style based on the trust level
                 if (trusted) {
                     isTrustedValueSpan.style.backgroundColor = '#28a745'; // Green
-                    isTrustedValueSpan.style.color = '#ffffff';
                 } else {
                     isTrustedValueSpan.style.backgroundColor = '#dc3545'; // Red
-                    isTrustedValueSpan.style.color = '#ffffff';
                 }
+
+                // --- Check 2: Coordinate Matching (relevant for mouse/pointer events) ---
+                let coordsMatch = "N/A";
+                let coordsMatchSuspicious = false; // Flag for styling
+                // Check if relevant properties exist on the event object
+                if (typeof event.pageX !== 'undefined' && typeof event.pageY !== 'undefined' &&
+                    typeof event.screenX !== 'undefined' && typeof event.screenY !== 'undefined')
+                {
+                    coordsMatch = (event.pageY === event.screenY && event.pageX === event.screenX);
+                    const isFullscreen = (1 >= window.outerHeight - window.innerHeight);
+
+                    if (coordsMatch && !isFullscreen) {
+                         // Coordinates match AND we are NOT fullscreen - this is suspicious
+                        coordsMatchSuspicious = true;
+                    } else if (coordsMatch && isFullscreen) {
+                        // They match, but it's likely due to fullscreen - not suspicious
+                        coordsMatch = false; // Treat as non-matching for suspicion
+                        coordsMatchSuspicious = false;
+                    } else {
+                        // Coordinates don't match - not suspicious
+                        coordsMatchSuspicious = false;
+                    }
+                    // Update span text
+                     coordsMatchSpan.textContent = coordsMatch;
+                } else {
+                    // Properties don't exist (e.g., for keydown)
+                     coordsMatchSpan.textContent = "N/A";
+                     coordsMatchSuspicious = false;
+                }
+                // Update span style based on suspicion
+                 if (coordsMatch === "N/A") {
+                    coordsMatchSpan.style.backgroundColor = '#6c757d'; // Grey
+                 } else if (coordsMatchSuspicious) {
+                    coordsMatchSpan.style.backgroundColor = '#ffc107'; // Warning Yellow
+                    coordsMatchSpan.style.color = '#333'; // Dark text on yellow
+                 } else {
+                    coordsMatchSpan.style.backgroundColor = '#6c757d'; // Grey (not suspicious)
+                    coordsMatchSpan.style.color = '#ffffff';
+                 }
+
+
+                // --- Check 3: Coalesced Events (relevant for pointer/mouse/touch move) ---
+                let coalescedCount = "N/A";
+                // Check if the method exists on the event object
+                if (typeof event.getCoalescedEvents === 'function') {
+                   try {
+                       coalescedCount = event.getCoalescedEvents().length;
+                   } catch (e) {
+                       console.warn("Error calling getCoalescedEvents:", e);
+                       coalescedCount = "Error";
+                   }
+                }
+                coalescedCountSpan.textContent = coalescedCount;
+                // Optional: Style based on count (e.g., highlight if count > 0)
+                if (coalescedCount > 0) {
+                     coalescedCountSpan.style.backgroundColor = '#007bff'; // Brighter Blue
+                } else {
+                     coalescedCountSpan.style.backgroundColor = '#17a2b8'; // Info Blue
+                }
+
+
+                // --- Console Logging ---
+                console.clear();
+                console.log(`--- Event: ${type} ---`);
+                console.log(`  event.isTrusted: ${trusted}`);
+                console.log(`  Coords Match Screen (non-fullscreen)?: ${coordsMatchSuspicious} (Raw Match: ${coordsMatch === "N/A" ? "N/A" : coordsMatch})`);
+                console.log(`  Coalesced Events Count: ${coalescedCount}`);
+                if (type === 'keydown') {
+                    console.log(`  Key Pressed: ${event.key}`);
+                }
+                 if (typeof event.pageX !== 'undefined') {
+                    console.log(`  Coords: page(${event.pageX}, ${event.pageY}), screen(${event.screenX}, ${event.screenY})`);
+                 }
+                 console.log(`  Target:`, event.target);
+                 // console.trace("Event Stack Trace"); // Uncomment for deep debugging
             }
 
             // --- Attach Event Listeners ---
-            document.addEventListener('mousemove', handleEvent);
+            // Use pointermove for broader compatibility including touch, fallback to mousemove
+            if ('onpointermove' in window) {
+                 document.addEventListener('pointermove', handleEvent);
+            } else {
+                 document.addEventListener('mousemove', handleEvent); // Fallback
+            }
             document.addEventListener('click', handleEvent);
             document.addEventListener('keydown', handleEvent);
 
-            console.log("Event listeners for mousemove, click, and keydown are active.");
+            console.log("Advanced event listeners active.");
 
         }); // End of DOMContentLoaded listener
     </script>
